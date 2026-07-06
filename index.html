@@ -210,6 +210,9 @@ figure.ph figcaption { font-family:"Cormorant Garamond", serif; font-size:16.5px
     <div id="blowUI">
       <div id="blowMsg">Now blow out your candles — for real. Blow into your phone.</div>
       <button id="micBtn">I'm ready</button>
+      <div id="meterWrap" style="display:none; width:150px; height:4px; margin:12px auto 0; border-radius:2px; background:rgba(255,190,110,.18);">
+        <div id="meter" style="width:0%; height:100%; border-radius:2px; background:#f6a94e; transition:width .1s linear;"></div>
+      </div>
       <br>
       <button id="holdBtn">or press &amp; hold here to blow</button>
     </div>
@@ -250,17 +253,17 @@ const CONFIG = {
   // (the photo shows above the text). If a photo file is missing, it
   // gracefully falls back to text-only.
   dedications: [
-    { text: "To this cute meanie who constantly raises her eyebrows at me" },
-    { text: "My bully" },
-    { text: "A crybaby", photo: "photos/1.jpg" },
-    { text: "Confuses right from left" },
-    { text: "My fave person to annoy", photo: "photos/2.jpg" },
-    { text: "The girl with the prettiest smile", photo: "photos/3.jpg" },
-    { text: "To the most beautiful girl I know" }
+    { text: "To this cute meanie who constantly raises her eyebrows at me", photo: "photos/1.jpg" },
+    { text: "My bully", photo: "photos/2.jpg" },
+    { text: "A crybaby", photo: "photos/3.jpg" },
+    { text: "Confuses right from left", photo: "photos/4.jpg" },
+    { text: "My fave person to annoy", photo: "photos/5.jpg" },
+    { text: "The girl with the prettiest smile", photo: "photos/6.jpg" },
+    { text: "To the most beautiful girl I know", photo: "photos/7.jpg" }
   ],
 
   // STAGE 3 — The sky reveal, drawn in lantern-light. Keep lines SHORT.
-  skyReveal: ["HAPPY", "BIRTHDAY", "POTATO"],
+  skyReveal: ["HAPPY", "BIRTHDAY", "MICHELLE!"],
 
   // Hidden firefly easter egg message (she has to catch it mid-flight).
   fireflyMessage: "You found the firefly. This is your reminder that I love you even when you bully me. ESPECIALLY when you bully me.",
@@ -283,13 +286,14 @@ const CONFIG = {
     "✏️ EDIT ME: Last paragraph. Land the plane. Short beats long here."
   ],
 
-  // STAGE 6 — Photo gallery. Drop images in the photos/ folder and list
-  // them here with captions. Missing files are skipped automatically.
+  // STAGE 6 — Photo gallery. Photos 1–7 are used by the lanterns above,
+  // so the gallery starts at 8. You CAN reuse a lantern photo here too —
+  // just point to the same file. Missing files are skipped automatically.
   gallery: [
-    { src: "photos/1.jpg", caption: "✏️ caption for photo 1" },
-    { src: "photos/2.jpg", caption: "✏️ caption for photo 2" },
-    { src: "photos/3.jpg", caption: "✏️ caption for photo 3" },
-    { src: "photos/4.jpg", caption: "✏️ caption for photo 4" }
+    { src: "photos/8.jpg", caption: "✏️ caption for this photo" },
+    { src: "photos/9.jpg", caption: "✏️ caption for this photo" },
+    { src: "photos/10.jpg", caption: "✏️ caption for this photo" },
+    { src: "photos/11.jpg", caption: "✏️ caption for this photo" }
   ],
 
   // Sign-off under "See you when you're home."
@@ -607,32 +611,58 @@ function showBlowUI(){
 }
 
 $("micBtn").addEventListener("click", async () => {
-  $("micBtn").textContent = "Listening… blow!";
+  $("micBtn").textContent = "Listening…";
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Disable browser audio processing: noise suppression is built to
+    // filter out exactly the noise a blow makes.
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false
+    }}).catch(() => navigator.mediaDevices.getUserMedia({ audio: true }));
     const AC = window.AudioContext || window.webkitAudioContext;
     const ac = new AC();
+    if (ac.state === "suspended") await ac.resume(); // iOS Safari starts suspended
     const src = ac.createMediaStreamSource(stream);
     const an = ac.createAnalyser();
-    an.fftSize = 256;
+    an.fftSize = 512;
+    an.smoothingTimeConstant = 0.4;
     src.connect(an);
-    const buf = new Uint8Array(an.frequencyBinCount);
-    let hot = 0;
+    const fbuf = new Uint8Array(an.frequencyBinCount);
+    const tbuf = new Uint8Array(an.fftSize);
+    $("meterWrap").style.display = "block";
+    $("micBtn").textContent = "Blow at your phone!";
+
+    let hot = 0, ticks = 0, baseline = 0, samples = 0;
     const iv = setInterval(() => {
-      an.getByteFrequencyData(buf);
-      let s = 0; for (let i = 1; i <= 8; i++) s += buf[i];
-      s /= 8;
-      if (s > 132){ hot++; if (hot >= 3){
+      // low-frequency energy (blows are broadband but strongest low)
+      an.getByteFrequencyData(fbuf);
+      let lo = 0; for (let i = 1; i <= 12; i++) lo += fbuf[i];
+      lo /= 12;
+      // overall loudness (RMS of waveform)
+      an.getByteTimeDomainData(tbuf);
+      let rms = 0; for (let i = 0; i < tbuf.length; i++){ const d = tbuf[i] - 128; rms += d * d; }
+      rms = Math.sqrt(rms / tbuf.length); // 0..~90
+      const level = Math.max(lo, rms * 2.4);
+
+      ticks++;
+      if (ticks <= 10){ baseline += level; samples++; return; } // ~0.8s calibration
+      const base = baseline / samples;
+      const threshold = Math.max(base + 26, base * 1.7, 46);
+      $("meter").style.width = Math.min(100, (level / threshold) * 100) + "%";
+
+      if (level > threshold){ hot++; if (hot >= 3){
         clearInterval(iv);
         stream.getTracks().forEach(t => t.stop());
         ac.close();
+        $("meterWrap").style.display = "none";
         blowOut();
       } } else hot = Math.max(0, hot - 1);
-    }, 90);
+    }, 80);
     setTimeout(() => $("holdBtn").classList.add("show"), 8000);
   } catch (err) {
     $("micBtn").style.display = "none";
-    $("blowMsg").textContent = "No mic? No problem —";
+    $("blowMsg").textContent = (err && err.name === "NotAllowedError")
+      ? "Mic is blocked on this browser — no problem, just"
+      : "No mic? No problem —";
     $("holdBtn").classList.add("show");
   }
 });
