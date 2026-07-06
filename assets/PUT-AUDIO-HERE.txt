@@ -1,0 +1,4 @@
+Optional files:
+  music.mp3  = background song (soft instrumental recommended)
+  voice.mp3  = your voice note (plays at the end of the letter)
+Buttons hide themselves automatically if these files are missing.
