@@ -179,14 +179,14 @@ figure.ph figcaption { font-family:"Cormorant Garamond", serif; font-size:16.5px
 
   <div id="gate">
     <div id="gateName">FOR1 MICHELLE</div>
-    <div id="gateTitle" class="serif">Something is waiting for you</div>
+    <div id="gateTitle" class="serif">A little something i made for you</div>
     <div id="clock">
       <div class="unit"><b id="dd">–</b><span>DAYS</span></div>
       <div class="unit"><b id="hh">–</b><span>HOURS</span></div>
       <div class="unit"><b id="mm">–</b><span>MIN</span></div>
       <div class="unit"><b id="ss">–</b><span>SEC</span></div>
     </div>
-    <div id="gateSub">Come back when the clock runs out, birthday girl. No peeking early — the sky isn't ready yet.</div>
+    <div id="gateSub">Come back when the clock runs out. The sky isn't ready yet.</div>
     <button id="enterBtn">Begin</button>
   </div>
 
@@ -349,7 +349,7 @@ musicBtn.addEventListener("click", e => {
     if (d <= 0 || testMode){
       clearInterval(iv);
       $("dd").textContent = $("hh").textContent = $("mm").textContent = $("ss").textContent = "0";
-      $("gateTitle").textContent = "It's your birthday.";
+      $("gateTitle").textContent = "It's your birthday!";
       $("gateSub").textContent = "The sky is ready for you now.";
       $("enterBtn").style.display = "inline-block";
       return;
